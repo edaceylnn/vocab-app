@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,45 +8,38 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import Colors, { primary } from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
-import { createCard, getAllSets, getOrCreateDefaultSet } from '@/lib/db';
+import { createCard } from '@/lib/db';
+import { useSets } from '@/lib/hooks';
 import type { SetRow } from '@/lib/types';
 
 export default function AddScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { sets, defaultSet } = useSets();
 
   const [word, setWord] = useState('');
   const [meaning, setMeaning] = useState('');
   const [example, setExample] = useState('');
-  const [sets, setSets] = useState<SetRow[]>([]);
   const [selectedSetId, setSelectedSetId] = useState<string | null>(null);
   const [rapidFire, setRapidFire] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const loadSets = useCallback(async () => {
-    const allSets = await getAllSets();
-    setSets(allSets);
-    if (allSets.length === 0) return;
-    const defaultSet = await getOrCreateDefaultSet();
+  useEffect(() => {
+    if (sets.length === 0 || !defaultSet) return;
     setSelectedSetId((prev) => {
       if (!prev) return defaultSet.id;
-      if (!allSets.find((s) => s.id === prev)) return allSets[0].id;
+      if (!sets.find((s) => s.id === prev)) return sets[0].id;
       return prev;
     });
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadSets();
-    }, [loadSets])
-  );
+  }, [sets, defaultSet]);
 
   const canSave = word.trim() && meaning.trim() && selectedSetId;
 
@@ -62,6 +55,9 @@ export default function AddScreen() {
       } else {
         router.back();
       }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save card. Please try again.';
+      Alert.alert('Error', message);
     } finally {
       setSaving(false);
     }
@@ -76,7 +72,13 @@ export default function AddScreen() {
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={styles.headerSpacer} />
         <Text style={[styles.title, { color: colors.text }]}>New Vocabulary</Text>
-        <Pressable onPress={() => router.back()} style={styles.closeBtn} hitSlop={12}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.closeBtn}
+          hitSlop={12}
+          accessibilityLabel="Close"
+          accessibilityRole="button"
+        >
           <MaterialCommunityIcons name="close" size={24} color={colors.text} />
         </Pressable>
       </View>
@@ -147,6 +149,8 @@ export default function AddScreen() {
                     : { backgroundColor: colors.cardBg, borderColor: colors.border },
                 ]}
                 onPress={() => setSelectedSetId(s.id)}
+                accessibilityLabel={`Add to set ${s.name}`}
+                accessibilityRole="button"
               >
                 <Text
                   style={[
@@ -162,6 +166,8 @@ export default function AddScreen() {
             <Pressable
               style={[styles.setChip, styles.setChipNew, { borderColor: colors.border, backgroundColor: colors.cardBg }]}
               onPress={() => router.push('/set/new')}
+              accessibilityLabel="Create new set"
+              accessibilityRole="button"
             >
               <MaterialCommunityIcons name="plus" size={18} color={primary} />
               <Text style={[styles.setChipText, { color: primary }]}>New set</Text>
@@ -186,6 +192,8 @@ export default function AddScreen() {
           <Pressable
             style={[styles.toggle, rapidFire && styles.toggleOn]}
             onPress={() => setRapidFire(!rapidFire)}
+            accessibilityLabel={rapidFire ? 'Rapid fire mode on' : 'Rapid fire mode off'}
+            accessibilityRole="switch"
           >
             <View style={[styles.toggleThumb, rapidFire && styles.toggleThumbOn]} />
           </Pressable>
@@ -195,6 +203,8 @@ export default function AddScreen() {
           style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
           onPress={saveEntry}
           disabled={!canSave || saving}
+          accessibilityLabel="Save entry"
+          accessibilityRole="button"
         >
           <MaterialCommunityIcons name="content-save" size={22} color="#fff" />
           <Text style={styles.saveBtnText}>Save Entry</Text>

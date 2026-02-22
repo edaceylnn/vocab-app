@@ -9,6 +9,7 @@ import {
   Alert,
   ActionSheetIOS,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,6 +32,7 @@ export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const [loading, setLoading] = useState(true);
   const [cards, setCards] = useState<CardRow[]>([]);
   const [sets, setSets] = useState<SetRow[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,13 +55,18 @@ export default function LibraryScreen() {
   }, [sets, filteredCards]);
 
   const load = useCallback(async () => {
-    await getOrCreateDefaultSet();
-    const [allCards, allSets] = await Promise.all([
-      getAllCards(),
-      getAllSets(),
-    ]);
-    setCards(allCards);
-    setSets(allSets);
+    setLoading(true);
+    try {
+      await getOrCreateDefaultSet();
+      const [allCards, allSets] = await Promise.all([
+        getAllCards(),
+        getAllSets(),
+      ]);
+      setCards(allCards);
+      setSets(allSets);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useFocusEffect(
@@ -119,6 +126,14 @@ export default function LibraryScreen() {
     [router, load]
   );
 
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View
@@ -147,6 +162,8 @@ export default function LibraryScreen() {
               { borderColor: primary },
               pressed && styles.btnPressed,
             ]}
+            accessibilityLabel="Create new set"
+            accessibilityRole="button"
           >
             <MaterialCommunityIcons name="folder-plus-outline" size={18} color={primary} />
             <Text style={[styles.newSetBtnText, { color: primary }]}>New set</Text>
@@ -181,6 +198,8 @@ export default function LibraryScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
+            accessibilityLabel="Search words or meanings"
+            accessibilityRole="search"
           />
           {searchQuery.length > 0 && (
             <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
@@ -304,6 +323,8 @@ export default function LibraryScreen() {
                 pressed && styles.btnPressed,
               ]}
               hitSlop={8}
+              accessibilityLabel={`Actions for ${item.front}`}
+              accessibilityRole="button"
             >
               <MaterialCommunityIcons name="dots-vertical" size={22} color={colors.muted} />
             </Pressable>
@@ -317,6 +338,7 @@ export default function LibraryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  centered: { alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

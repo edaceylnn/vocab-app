@@ -125,7 +125,12 @@ export default function ReviewScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={styles.headerBtn}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.headerBtn}
+          accessibilityLabel="Close"
+          accessibilityRole="button"
+        >
           <MaterialCommunityIcons name="close" size={24} color={colors.muted} />
         </Pressable>
         <View style={styles.progressWrap}>
@@ -152,7 +157,12 @@ export default function ReviewScreen() {
         </Pressable>
       </View>
 
-      <Pressable style={styles.cardArea} onPress={flip}>
+      <Pressable
+        style={styles.cardArea}
+        onPress={flip}
+        accessibilityLabel={flipped ? 'Show word again' : 'Reveal meaning'}
+        accessibilityRole="button"
+      >
         <Animated.View
           style={[
             styles.card,
@@ -201,6 +211,8 @@ export default function ReviewScreen() {
         <Pressable
           style={[styles.nextBtn, { backgroundColor: primary }]}
           onPress={handleNext}
+          accessibilityLabel="Next card"
+          accessibilityRole="button"
         >
           <Text style={styles.nextBtnText}>Next</Text>
         </Pressable>

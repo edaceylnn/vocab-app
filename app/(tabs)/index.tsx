@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Pressable, ScrollView, useWindowDimensions } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { StyleSheet, Pressable, ScrollView, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
@@ -8,17 +7,7 @@ import { Text, View } from '@/components/Themed';
 import Colors, { primary } from '@/constants/Colors';
 import { PAGE_PADDING_HORIZONTAL, PAGE_PADDING_TOP, CONTENT_BOTTOM_PADDING } from '@/constants/Layout';
 import { useColorScheme } from '@/components/useColorScheme';
-import {
-  getSetCardCount,
-  getTodayReviewedCount,
-  getOrCreateDefaultSet,
-  getTotalCardCount,
-  getAllSets,
-} from '@/lib/db';
-
-const RECENT_SETS_LIMIT = 3;
-
-type SetWithCount = { id: string; name: string; count: number };
+import { useDailyStats } from '@/lib/hooks';
 
 const DEFAULT_DAILY_GOAL = 30;
 
@@ -35,39 +24,13 @@ export default function DailyScreen() {
   const { width } = useWindowDimensions();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const [defaultSetId, setDefaultSetId] = useState<string | null>(null);
-  const [totalCards, setTotalCards] = useState(0);
-  const [reviewedToday, setReviewedToday] = useState(0);
-  const [totalInLibrary, setTotalInLibrary] = useState(0);
-  const [recentSets, setRecentSets] = useState<SetWithCount[]>([]);
-
-  const refresh = useCallback(async () => {
-    const defaultSet = await getOrCreateDefaultSet();
-    const allSets = await getAllSets();
-    const recent = allSets.slice(0, RECENT_SETS_LIMIT);
-    const counts = await Promise.all(recent.map((s) => getSetCardCount(s.id)));
-    const withCount: SetWithCount[] = recent.map((s, i) => ({
-      id: s.id,
-      name: s.name,
-      count: counts[i] ?? 0,
-    }));
-    const [total, reviewed, totalCount] = await Promise.all([
-      getSetCardCount(defaultSet.id),
-      getTodayReviewedCount(),
-      getTotalCardCount(),
-    ]);
-    setDefaultSetId(defaultSet.id);
-    setTotalCards(total);
-    setReviewedToday(reviewed);
-    setTotalInLibrary(totalCount);
-    setRecentSets(withCount);
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      refresh();
-    }, [refresh])
-  );
+  const {
+    totalCards,
+    reviewedToday,
+    totalInLibrary,
+    recentSets,
+    loading,
+  } = useDailyStats();
 
   const goal = DEFAULT_DAILY_GOAL;
   const completed = Math.min(reviewedToday, goal);
@@ -76,6 +39,14 @@ export default function DailyScreen() {
 
   const contentPaddingBottom = CONTENT_BOTTOM_PADDING + insets.bottom;
   const headerPaddingTop = Math.max(insets.top, 16) + PAGE_PADDING_TOP;
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -100,7 +71,12 @@ export default function DailyScreen() {
             <Text style={[styles.title, { color: colors.text }]}>Daily Progress</Text>
           </View>
           <View style={styles.headerRight}>
-            <Pressable onPress={() => router.push('/add')} style={styles.addBtn}>
+            <Pressable
+              onPress={() => router.push('/add')}
+              style={styles.addBtn}
+              accessibilityLabel="Add new word"
+              accessibilityRole="button"
+            >
               <MaterialCommunityIcons name="plus" size={22} color={primary} />
             </Pressable>
           </View>
@@ -149,6 +125,8 @@ export default function DailyScreen() {
             pressed && styles.ctaPressed,
           ]}
           onPress={() => router.push('/review/all')}
+          accessibilityLabel="Start learning. Total cards in library."
+          accessibilityRole="button"
         >
           <View style={[styles.ctaLeft, { backgroundColor: 'transparent' }]}>
             <View style={styles.ctaIconWrap}>
@@ -163,6 +141,11 @@ export default function DailyScreen() {
             </View>
         </Pressable>
 
+        {totalInLibrary === 0 && (
+          <Text style={[styles.emptyHint, { color: colors.muted }]}>
+            No cards yet. Add your first word to get started.
+          </Text>
+        )}
 
         {recentSets.length > 0 && (
           <View style={[styles.categoriesSection, { backgroundColor: 'transparent' }]}>
@@ -181,6 +164,8 @@ export default function DailyScreen() {
                   pressed && styles.setRowPressed,
                 ]}
                 onPress={() => router.push(`/review/${set.id}`)}
+                accessibilityLabel={`Review set ${set.name}, ${set.count} words`}
+                accessibilityRole="button"
               >
                 <MaterialCommunityIcons name="folder-outline" size={22} color={primary} />
                 <Text style={[styles.setRowName, { color: colors.text }]} numberOfLines={1}>
@@ -216,6 +201,7 @@ export default function DailyScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  centered: { alignItems: 'center', justifyContent: 'center' },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 120 },
   header: {
@@ -289,6 +275,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   ctaBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  emptyHint: { marginTop: 16, textAlign: 'center', fontSize: 14 },
 
   statsRow: { marginTop: 24, alignItems: 'center' },
   statsText: { fontSize: 13, fontWeight: '500' },

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -16,16 +16,22 @@ export default function SettingsScreen() {
   const { width } = useWindowDimensions();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const [loading, setLoading] = useState(true);
   const [totalWords, setTotalWords] = useState(0);
   const [reviewedToday, setReviewedToday] = useState(0);
 
   const loadStats = useCallback(async () => {
-    const [total, today] = await Promise.all([
-      getTotalCardCount(),
-      getTodayReviewedCount(),
-    ]);
-    setTotalWords(total);
-    setReviewedToday(today);
+    setLoading(true);
+    try {
+      const [total, today] = await Promise.all([
+        getTotalCardCount(),
+        getTodayReviewedCount(),
+      ]);
+      setTotalWords(total);
+      setReviewedToday(today);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useFocusEffect(
@@ -37,6 +43,14 @@ export default function SettingsScreen() {
   const headerPaddingTop = Math.max(insets.top, 16) + PAGE_PADDING_TOP;
   const contentPaddingBottom = CONTENT_BOTTOM_PADDING + insets.bottom;
   const maxWidth = width > 480 ? 480 : undefined;
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -94,6 +108,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  centered: { alignItems: 'center', justifyContent: 'center' },
   scroll: { flex: 1 },
   scrollContent: {},
   profileBlock: {

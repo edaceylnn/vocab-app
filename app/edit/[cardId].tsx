@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -56,6 +57,9 @@ export default function EditCardScreen() {
     try {
       await updateCard(cardId, word.trim(), meaning.trim(), example.trim() || null);
       router.back();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save changes. Please try again.';
+      Alert.alert('Error', message);
     } finally {
       setSaving(false);
     }
@@ -89,7 +93,13 @@ export default function EditCardScreen() {
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={styles.headerSpacer} />
         <Text style={[styles.title, { color: colors.text }]}>Edit word</Text>
-        <Pressable onPress={() => router.back()} style={styles.closeBtn} hitSlop={12}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.closeBtn}
+          hitSlop={12}
+          accessibilityLabel="Close"
+          accessibilityRole="button"
+        >
           <MaterialCommunityIcons name="close" size={24} color={colors.text} />
         </Pressable>
       </View>
@@ -146,6 +156,8 @@ export default function EditCardScreen() {
           style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
           onPress={saveEntry}
           disabled={!canSave || saving}
+          accessibilityLabel="Save changes"
+          accessibilityRole="button"
         >
           {saving ? (
             <ActivityIndicator size="small" color="#fff" />

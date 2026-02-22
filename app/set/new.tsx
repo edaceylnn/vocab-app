@@ -7,6 +7,7 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -30,6 +31,9 @@ export default function NewSetScreen() {
     try {
       await createSet(name.trim());
       router.back();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create set. Please try again.';
+      Alert.alert('Error', message);
     } finally {
       setSaving(false);
     }
@@ -43,7 +47,13 @@ export default function NewSetScreen() {
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={styles.headerSpacer} />
         <Text style={[styles.title, { color: colors.text }]}>New set</Text>
-        <Pressable onPress={() => router.back()} style={styles.closeBtn} hitSlop={12}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.closeBtn}
+          hitSlop={12}
+          accessibilityLabel="Close"
+          accessibilityRole="button"
+        >
           <MaterialCommunityIcons name="close" size={24} color={colors.text} />
         </Pressable>
       </View>
@@ -62,6 +72,8 @@ export default function NewSetScreen() {
           style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
           onPress={handleSave}
           disabled={!canSave || saving}
+          accessibilityLabel="Create set"
+          accessibilityRole="button"
         >
           <MaterialCommunityIcons name="plus" size={22} color="#fff" />
           <Text style={styles.saveBtnText}>Create set</Text>

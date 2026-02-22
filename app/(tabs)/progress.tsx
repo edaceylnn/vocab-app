@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -16,25 +16,31 @@ export default function ProgressScreen() {
   const { width } = useWindowDimensions();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const [loading, setLoading] = useState(true);
   const [totalWords, setTotalWords] = useState(0);
   const [reviewedToday, setReviewedToday] = useState(0);
   const [setCounts, setSetCounts] = useState<{ name: string; count: number }[]>([]);
 
   const loadStats = useCallback(async () => {
-    const [total, today, sets] = await Promise.all([
-      getTotalCardCount(),
-      getTodayReviewedCount(),
-      getAllSets(),
-    ]);
-    setTotalWords(total);
-    setReviewedToday(today);
-    const counts = await Promise.all(
-      sets.slice(0, 5).map(async (s) => ({
-        name: s.name,
-        count: await getSetCardCount(s.id),
-      }))
-    );
-    setSetCounts(counts);
+    setLoading(true);
+    try {
+      const [total, today, sets] = await Promise.all([
+        getTotalCardCount(),
+        getTodayReviewedCount(),
+        getAllSets(),
+      ]);
+      setTotalWords(total);
+      setReviewedToday(today);
+      const counts = await Promise.all(
+        sets.slice(0, 5).map(async (s) => ({
+          name: s.name,
+          count: await getSetCardCount(s.id),
+        }))
+      );
+      setSetCounts(counts);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useFocusEffect(
@@ -49,6 +55,14 @@ export default function ProgressScreen() {
   const pct = DEFAULT_DAILY_GOAL > 0
     ? Math.round((Math.min(reviewedToday, DEFAULT_DAILY_GOAL) / DEFAULT_DAILY_GOAL) * 100)
     : 0;
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -110,6 +124,7 @@ export default function ProgressScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  centered: { alignItems: 'center', justifyContent: 'center' },
   scroll: { flex: 1 },
   scrollContent: {},
   title: { fontSize: 24, fontWeight: '700' },

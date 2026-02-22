@@ -1,7 +1,42 @@
 import type { CardRow, SetRow } from './types';
 
-const sets: SetRow[] = [];
-const cards: CardRow[] = [];
+const STORAGE_KEYS = { sets: 'vocab_sets', cards: 'vocab_cards' } as const;
+
+function readFromStorage<T>(key: string, fallback: T): T {
+  if (typeof localStorage === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw == null) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeToStorage(key: string, value: unknown): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore quota or other storage errors
+  }
+}
+
+function getSets(): SetRow[] {
+  return readFromStorage(STORAGE_KEYS.sets, []);
+}
+
+function getCards(): CardRow[] {
+  return readFromStorage(STORAGE_KEYS.cards, []);
+}
+
+function setSets(sets: SetRow[]): void {
+  writeToStorage(STORAGE_KEYS.sets, sets);
+}
+
+function setCards(cards: CardRow[]): void {
+  writeToStorage(STORAGE_KEYS.cards, cards);
+}
 
 function uuid(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/x/g, () =>
@@ -14,18 +49,21 @@ function todayISO(): string {
 }
 
 export async function createSet(name: string): Promise<SetRow> {
+  const sets = getSets();
   const id = uuid();
   const createdAt = new Date().toISOString();
-  sets.push({ id, name, createdAt });
-  return { id, name, createdAt };
+  const row: SetRow = { id, name, createdAt };
+  sets.push(row);
+  setSets(sets.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1)));
+  return row;
 }
 
 export async function getAllSets(): Promise<SetRow[]> {
-  return [...sets].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+  return [...getSets()].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
 }
 
 export async function getSetCardCount(setId: string): Promise<number> {
-  return cards.filter((c) => c.setId === setId).length;
+  return getCards().filter((c) => c.setId === setId).length;
 }
 
 export async function createCard(
@@ -34,6 +72,7 @@ export async function createCard(
   back: string,
   example: string | null = null
 ): Promise<CardRow> {
+  const cards = getCards();
   const id = uuid();
   const nextReviewAt = todayISO();
   const row: CardRow = {
@@ -49,11 +88,13 @@ export async function createCard(
     wrongCount: 0,
   };
   cards.push(row);
+  setCards(cards.sort((a, b) => (a.front > b.front ? 1 : -1)));
   return row;
 }
 
 export async function getCardsDueToday(setId: string | null): Promise<CardRow[]> {
   const today = todayISO();
+  const cards = getCards();
   const due = cards.filter(
     (c) => c.nextReviewAt <= today && (setId == null || c.setId === setId)
   );
@@ -61,24 +102,30 @@ export async function getCardsDueToday(setId: string | null): Promise<CardRow[]>
 }
 
 export async function getCardsForStudy(setId: string): Promise<CardRow[]> {
-  return cards.filter((c) => c.setId === setId).sort((a, b) => (a.front > b.front ? 1 : -1));
+  return getCards()
+    .filter((c) => c.setId === setId)
+    .sort((a, b) => (a.front > b.front ? 1 : -1));
 }
 
 export async function markCardReviewed(cardId: string): Promise<void> {
+  const cards = getCards();
   const card = cards.find((c) => c.id === cardId);
-  if (card) card.lastReviewedAt = new Date().toISOString();
+  if (card) {
+    card.lastReviewedAt = new Date().toISOString();
+    setCards(cards);
+  }
 }
 
 export async function getCardsDueCount(setId: string | null): Promise<number> {
   const today = todayISO();
-  return cards.filter(
+  return getCards().filter(
     (c) => c.nextReviewAt <= today && (setId == null || c.setId === setId)
   ).length;
 }
 
 export async function getBoxCounts(): Promise<Record<number, number>> {
   const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  for (const c of cards) counts[c.box] = (counts[c.box] ?? 0) + 1;
+  for (const c of getCards()) counts[c.box] = (counts[c.box] ?? 0) + 1;
   return counts;
 }
 
@@ -88,6 +135,7 @@ export async function updateCardAfterReview(
   nextReviewAt: string,
   correct: boolean
 ): Promise<void> {
+  const cards = getCards();
   const card = cards.find((c) => c.id === cardId);
   if (!card) return;
   card.box = newBox;
@@ -95,14 +143,15 @@ export async function updateCardAfterReview(
   card.lastReviewedAt = new Date().toISOString();
   if (correct) card.correctStreak += 1;
   else card.wrongCount += 1;
+  setCards(cards);
 }
 
 export async function getAllCards(): Promise<CardRow[]> {
-  return [...cards].sort((a, b) => (a.front > b.front ? 1 : -1));
+  return [...getCards()].sort((a, b) => (a.front > b.front ? 1 : -1));
 }
 
 export async function getCardsBySet(setId: string, search?: string): Promise<CardRow[]> {
-  let list = cards.filter((c) => c.setId === setId);
+  let list = getCards().filter((c) => c.setId === setId);
   if (search?.trim()) {
     const q = search.trim().toLowerCase();
     list = list.filter(
@@ -114,12 +163,13 @@ export async function getCardsBySet(setId: string, search?: string): Promise<Car
 }
 
 export async function getSetById(id: string): Promise<SetRow | null> {
-  return sets.find((s) => s.id === id) ?? null;
+  return getSets().find((s) => s.id === id) ?? null;
 }
 
 const DEFAULT_SET_NAME = 'Default';
 
 export async function getOrCreateDefaultSet(): Promise<SetRow> {
+  const sets = getSets();
   const existing = sets.find((s) => s.name === DEFAULT_SET_NAME);
   if (existing) return existing;
   return createSet(DEFAULT_SET_NAME);
@@ -127,17 +177,17 @@ export async function getOrCreateDefaultSet(): Promise<SetRow> {
 
 export async function getTodayReviewedCount(): Promise<number> {
   const today = todayISO();
-  return cards.filter(
+  return getCards().filter(
     (c) => c.lastReviewedAt && c.lastReviewedAt.slice(0, 10) === today
   ).length;
 }
 
 export async function getTotalCardCount(): Promise<number> {
-  return cards.length;
+  return getCards().length;
 }
 
 export async function getRecentCards(limit: number): Promise<CardRow[]> {
-  return [...cards]
+  return [...getCards()]
     .sort((a, b) => {
       const aAt = a.lastReviewedAt ?? '';
       const bAt = b.lastReviewedAt ?? '';
@@ -147,7 +197,7 @@ export async function getRecentCards(limit: number): Promise<CardRow[]> {
 }
 
 export async function getCardById(cardId: string): Promise<CardRow | null> {
-  return cards.find((c) => c.id === cardId) ?? null;
+  return getCards().find((c) => c.id === cardId) ?? null;
 }
 
 export async function updateCard(
@@ -156,15 +206,17 @@ export async function updateCard(
   back: string,
   example: string | null
 ): Promise<void> {
+  const cards = getCards();
   const card = cards.find((c) => c.id === cardId);
   if (card) {
     card.front = front;
     card.back = back;
     card.example = example ?? null;
+    setCards(cards);
   }
 }
 
 export async function deleteCard(cardId: string): Promise<void> {
-  const idx = cards.findIndex((c) => c.id === cardId);
-  if (idx !== -1) cards.splice(idx, 1);
+  const cards = getCards().filter((c) => c.id !== cardId);
+  setCards(cards);
 }
