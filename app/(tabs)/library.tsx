@@ -5,7 +5,6 @@ import {
   SectionList,
   View,
   Text,
-  TextInput,
   Alert,
   ActionSheetIOS,
   Platform,
@@ -16,14 +15,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import Colors, { primary } from '@/constants/Colors';
+import { Typography } from '@/constants/Typography';
 import {
   PAGE_PADDING_HORIZONTAL,
   PAGE_PADDING_TOP,
   CONTENT_BOTTOM_PADDING,
 } from '@/constants/Layout';
 import { useColorScheme } from '@/components/useColorScheme';
+import { SearchBar } from '@/components/SearchBar';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { Surface } from '@/components/ui/Surface';
 import { getAllCards, getAllSets, getOrCreateDefaultSet, deleteCard } from '@/lib/db';
 import type { CardRow, SetRow } from '@/lib/types';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 
 type Section = { id: string; name: string; data: CardRow[] };
 
@@ -36,23 +40,30 @@ export default function LibraryScreen() {
   const [cards, setCards] = useState<CardRow[]>([]);
   const [sets, setSets] = useState<SetRow[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(searchQuery, 200);
 
   const filteredCards = useMemo(() => {
-    if (!searchQuery.trim()) return cards;
-    const q = searchQuery.trim().toLowerCase();
+    if (!debouncedQuery.trim()) return cards;
+    const q = debouncedQuery.trim().toLowerCase();
     return cards.filter(
       (c) =>
         c.front.toLowerCase().includes(q) || c.back.toLowerCase().includes(q)
     );
-  }, [cards, searchQuery]);
+  }, [cards, debouncedQuery]);
+
+  const filteredSets = useMemo(() => {
+    if (!debouncedQuery.trim()) return sets;
+    const q = debouncedQuery.trim().toLowerCase();
+    return sets.filter((s) => s.name.toLowerCase().includes(q));
+  }, [sets, debouncedQuery]);
 
   const sections = useMemo<Section[]>(() => {
-    return sets.map((s) => ({
+    return filteredSets.map((s) => ({
       id: s.id,
       name: s.name,
       data: filteredCards.filter((c) => c.setId === s.id),
     }));
-  }, [sets, filteredCards]);
+  }, [filteredSets, filteredCards]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,9 +89,8 @@ export default function LibraryScreen() {
   const headerPaddingTop = Math.max(insets.top, 16) + PAGE_PADDING_TOP;
   const listPaddingBottom = CONTENT_BOTTOM_PADDING + insets.bottom;
 
-  const rowBg =
-    colorScheme === 'dark' ? 'rgba(30,41,59,0.4)' : '#fff';
-  const rowBorder = colorScheme === 'dark' ? '#334155' : '#f1f5f9';
+  const rowBg = colors.surface1;
+  const rowBorder = colors.border;
 
   const openRowActions = useCallback(
     (item: CardRow) => {
@@ -149,12 +159,24 @@ export default function LibraryScreen() {
         <View>
           <Text style={[styles.title, { color: colors.text }]}>Library</Text>
           <Text style={[styles.subtitle, { color: colors.muted }]}>
-            {searchQuery.trim()
+            {debouncedQuery.trim()
               ? `${filteredCards.length} of ${cards.length}`
               : `${cards.length} ${cards.length === 1 ? 'word' : 'words'}`}
           </Text>
         </View>
         <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => router.push('/explore')}
+            style={({ pressed }) => [
+              styles.headerIconBtn,
+              { borderColor: colors.border, backgroundColor: colorScheme === 'dark' ? 'rgba(30,41,59,0.4)' : '#fff' },
+              pressed && styles.btnPressed,
+            ]}
+            accessibilityLabel="Search all sets"
+            accessibilityRole="button"
+          >
+            <MaterialCommunityIcons name="text-search" size={20} color={primary} />
+          </Pressable>
           <Pressable
             onPress={() => router.push('/set/new')}
             style={({ pressed }) => [
@@ -168,7 +190,6 @@ export default function LibraryScreen() {
             <MaterialCommunityIcons name="folder-plus-outline" size={18} color={primary} />
             <Text style={[styles.newSetBtnText, { color: primary }]}>New set</Text>
           </Pressable>
-      
         </View>
       </View>
 
@@ -181,37 +202,19 @@ export default function LibraryScreen() {
           },
         ]}
       >
-        <View
-          style={[
-            styles.searchInputWrap,
-            {
-              backgroundColor: colorScheme === 'dark' ? 'rgba(30,41,59,0.5)' : '#f1f5f9',
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <MaterialCommunityIcons name="magnify" size={20} color={colors.muted} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search words or meanings..."
-            placeholderTextColor={colors.muted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            returnKeyType="search"
-            accessibilityLabel="Search words or meanings"
-            accessibilityRole="search"
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-              <MaterialCommunityIcons name="close-circle" size={20} color={colors.muted} />
-            </Pressable>
-          )}
-        </View>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search sets, words, or meanings"
+          colors={colors}
+        />
       </View>
 
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
+        initialNumToRender={12}
+        windowSize={7}
         contentContainerStyle={[
           styles.listContent,
           {
@@ -234,37 +237,23 @@ export default function LibraryScreen() {
               />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              {sets.length === 0 ? 'No sets yet' : 'No words yet'}
+              {debouncedQuery.trim()
+                ? 'No matches'
+                : sets.length === 0
+                  ? 'No sets yet'
+                  : 'No words yet'}
             </Text>
             <Text style={[styles.emptyText, { color: colors.muted }]}>
-              {sets.length === 0
-                ? 'Create a set (e.g. Fruits, Animals) then add words to it.'
-                : 'Add your first word to start building your vocabulary list.'}
+              {debouncedQuery.trim()
+                ? 'Try a different search term.'
+                : sets.length === 0
+                  ? 'Create a set (e.g. Fruits, Animals) then add words to it.'
+                  : 'Add your first word to start building your vocabulary list.'}
             </Text>
-            {sets.length === 0 ? (
-              <Pressable
-                onPress={() => router.push('/set/new')}
-                style={({ pressed }) => [
-                  styles.emptyCta,
-                  { backgroundColor: primary },
-                  pressed && styles.btnPressed,
-                ]}
-              >
-                <MaterialCommunityIcons name="folder-plus-outline" size={20} color="#fff" />
-                <Text style={styles.emptyCtaText}>New set</Text>
-              </Pressable>
+            {debouncedQuery.trim() ? null : sets.length === 0 ? (
+              <PrimaryButton title="New set" colors={colors} onPress={() => router.push('/set/new')} style={styles.emptyCta} />
             ) : (
-              <Pressable
-                onPress={() => router.push('/add')}
-                style={({ pressed }) => [
-                  styles.emptyCta,
-                  { backgroundColor: primary },
-                  pressed && styles.btnPressed,
-                ]}
-              >
-                <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-                <Text style={styles.emptyCtaText}>Add word</Text>
-              </Pressable>
+              <PrimaryButton title="Add word" colors={colors} onPress={() => router.push('/add')} style={styles.emptyCta} />
             )}
           </View>
         }
@@ -290,7 +279,9 @@ export default function LibraryScreen() {
           </View>
         )}
         renderItem={({ item, index }) => (
-          <View
+          <Surface
+            variant="cardMuted"
+            colors={colors}
             style={[
               styles.row,
               {
@@ -329,7 +320,7 @@ export default function LibraryScreen() {
               <MaterialCommunityIcons name="dots-vertical" size={22} color={colors.muted} />
             </Pressable>
 
-          </View>
+          </Surface>
         )}
       />
     </View>
@@ -346,9 +337,17 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
   },
-  title: { fontSize: 24, fontWeight: '700' },
-  subtitle: { fontSize: 14, marginTop: 2 },
+  title: { ...Typography.title },
+  subtitle: { ...Typography.bodySmall, marginTop: 2 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   newSetBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -358,7 +357,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
   },
-  newSetBtnText: { fontWeight: '700', fontSize: 14 },
+  newSetBtnText: { ...Typography.subheading },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -368,19 +367,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   btnPressed: { opacity: 0.9 },
-  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  addBtnText: { ...Typography.bodyMedium, color: '#fff' },
 
-  searchWrap: { paddingVertical: 12, paddingBottom: 16},
-  searchInputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    height: 44,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  searchInput: { flex: 1, fontSize: 16, paddingVertical: 0 },
+  searchWrap: { paddingVertical: 12, paddingBottom: 16 },
 
   listContent: { paddingTop: 8 },
   sectionHeader: {
@@ -391,8 +380,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderBottomWidth: 1,
   },
-  sectionTitle: { fontSize: 17, fontWeight: '700', flex: 1 },
-  sectionCount: { fontSize: 13 },
+  sectionTitle: { ...Typography.heading, flex: 1 },
+  sectionCount: { ...Typography.bodySmall },
   sectionStudyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -402,7 +391,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1.5,
   },
-  sectionStudyText: { fontSize: 12, fontWeight: '700' },
+  sectionStudyText: { ...Typography.captionMedium },
   empty: {
     paddingVertical: 48,
     alignItems: 'center',
@@ -416,22 +405,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 24,
   },
-  emptyTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
+  emptyTitle: { ...Typography.titleMedium, marginBottom: 8 },
   emptyText: {
-    fontSize: 15,
+    ...Typography.bodySmall,
     textAlign: 'center',
-    lineHeight: 22,
     marginBottom: 28,
   },
-  emptyCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 14,
-  },
-  emptyCtaText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  emptyCta: { marginTop: 6 },
 
   row: {
     flexDirection: 'row',
@@ -440,6 +420,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     marginBottom: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 1,
+    shadowRadius: 22,
+    elevation: 6,
   },
   rowContent: { flex: 1, marginRight: 8 },
   rowMenu: {
@@ -450,10 +434,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 6,
   },
-  word: { fontSize: 17, fontWeight: '700' },
-  meaning: { fontSize: 15, marginTop: 4 },
+  word: { ...Typography.heading },
+  meaning: { ...Typography.bodySmall, marginTop: 4 },
   example: {
-    fontSize: 13,
+    ...Typography.caption,
     fontStyle: 'italic',
     marginTop: 6,
     opacity: 0.9,

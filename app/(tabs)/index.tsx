@@ -1,15 +1,15 @@
-import { StyleSheet, Pressable, ScrollView, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { StyleSheet, Pressable, ScrollView, Text, View, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-
-import { Text, View } from '@/components/Themed';
 import Colors, { primary } from '@/constants/Colors';
+import { Typography } from '@/constants/Typography';
 import { PAGE_PADDING_HORIZONTAL, PAGE_PADDING_TOP, CONTENT_BOTTOM_PADDING } from '@/constants/Layout';
 import { useColorScheme } from '@/components/useColorScheme';
-import { useDailyStats } from '@/lib/hooks';
-
-const DEFAULT_DAILY_GOAL = 30;
+import { hapticLight } from '@/lib/haptics';
+import { Surface } from '@/components/ui/Surface';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { useDailyGoal, useDailyStats } from '@/lib/hooks';
 
 function formatDate() {
   const d = new Date();
@@ -31,8 +31,7 @@ export default function DailyScreen() {
     recentSets,
     loading,
   } = useDailyStats();
-
-  const goal = DEFAULT_DAILY_GOAL;
+  const { goal } = useDailyGoal();
   const completed = Math.min(reviewedToday, goal);
   const pct = goal > 0 ? Math.round((completed / goal) * 100) : 0;
   const remaining = Math.max(0, goal - completed);
@@ -82,15 +81,7 @@ export default function DailyScreen() {
           </View>
         </View>
 
-        <View
-          style={[
-            styles.goalCard,
-            {
-              backgroundColor: colorScheme === 'dark' ? 'rgba(30,41,59,0.4)' : '#fff',
-              borderColor: colorScheme === 'dark' ? '#334155' : '#f1f5f9',
-            },
-          ]}
-        >
+        <Surface variant="card" colors={colors} style={styles.goalCard}>
           <View style={[styles.circularWrap, { backgroundColor: 'transparent' }]}>
             <View style={[styles.circularBg, { borderColor: colors.border, backgroundColor: 'transparent' }]}>
               <Text style={[styles.circularValue, { color: colors.text }]}>
@@ -117,29 +108,17 @@ export default function DailyScreen() {
               {remaining} more cards to reach your streak!
             </Text>
           )}
-        </View>
+        </Surface>
 
-        <Pressable
-          style={({ pressed }) => [
-            styles.cta,
-            pressed && styles.ctaPressed,
-          ]}
-          onPress={() => router.push('/review/all')}
-          accessibilityLabel="Start learning. Total cards in library."
-          accessibilityRole="button"
-        >
-          <View style={[styles.ctaLeft, { backgroundColor: 'transparent' }]}>
-            <View style={styles.ctaIconWrap}>
-              <MaterialCommunityIcons name="play" size={28} color="#fff" />
-            </View>
-            <View style={{ backgroundColor: 'transparent' }}>
-              <Text style={styles.ctaTitle}>Start Learning</Text>
-            </View>
-          </View>
-            <View style={styles.ctaBadge}>
-              <Text style={styles.ctaBadgeText}>{totalInLibrary} cards</Text>
-            </View>
-        </Pressable>
+        <PrimaryButton
+          title={`Start Learning (${totalInLibrary} cards)`}
+          colors={colors}
+          onPress={() => {
+            hapticLight();
+            router.push('/review/all');
+          }}
+          style={styles.primaryCta}
+        />
 
         {totalInLibrary === 0 && (
           <Text style={[styles.emptyHint, { color: colors.muted }]}>
@@ -158,8 +137,9 @@ export default function DailyScreen() {
                 style={({ pressed }) => [
                   styles.setRow,
                   {
-                    backgroundColor: colorScheme === 'dark' ? 'rgba(30,41,59,0.4)' : '#fff',
-                    borderColor: colorScheme === 'dark' ? '#334155' : '#f1f5f9',
+                    backgroundColor: colors.surface1,
+                    borderColor: colors.border,
+                    shadowColor: colors.shadow,
                   },
                   pressed && styles.setRowPressed,
                 ]}
@@ -211,8 +191,8 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerLeft: {},
-  dateLabel: { fontSize: 12, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 2 },
-  title: { fontSize: 24, fontWeight: '700', marginTop: 2 },
+  dateLabel: { ...Typography.captionUppercase },
+  title: { ...Typography.title, marginTop: 2 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   addBtn: { padding: 4 },
 
@@ -233,30 +213,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  circularValue: { fontSize: 28, fontWeight: '700' },
-  circularLabel: { fontSize: 12, fontWeight: '500', marginTop: 2 },
+  circularValue: { ...Typography.numericLarge },
+  circularLabel: { ...Typography.captionMedium, marginTop: 2 },
   goalBarWrap: { width: '80%', marginTop: 16, height: 6, borderRadius: 3, overflow: 'hidden' },
   goalBarBg: { flex: 1, borderRadius: 3, flexDirection: 'row' },
   goalBarFill: { height: '100%', borderRadius: 3 },
-  goalText: { marginTop: 8, fontWeight: '500' },
-  goalSubtext: { fontSize: 12, marginTop: 4 },
+  goalText: { ...Typography.bodySmallMedium, marginTop: 8 },
+  goalSubtext: { ...Typography.caption, marginTop: 4 },
 
-  cta: {
-    marginTop: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: primary,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    shadowColor: primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  ctaPressed: { opacity: 0.95, transform: [{ scale: 0.98 }] },
   ctaLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   ctaIconWrap: {
     width: 48,
@@ -266,22 +230,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  ctaSubtitle: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginTop: 2 },
+  ctaTitle: { ...Typography.heading, color: '#fff' },
+  ctaSubtitle: { ...Typography.bodySmall, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   ctaBadge: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
   },
-  ctaBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  emptyHint: { marginTop: 16, textAlign: 'center', fontSize: 14 },
+  ctaBadgeText: { ...Typography.captionMedium, color: '#fff' },
+  emptyHint: { ...Typography.bodySmall, marginTop: 16, textAlign: 'center' },
+  primaryCta: {
+    marginTop: 32,
+  },
 
   statsRow: { marginTop: 24, alignItems: 'center' },
-  statsText: { fontSize: 13, fontWeight: '500' },
+  statsText: { ...Typography.bodySmallMedium },
 
   categoriesSection: { marginTop: 28 },
-  categoriesTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  categoriesTitle: { ...Typography.heading, marginBottom: 12 },
   setRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -293,8 +260,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   setRowPressed: { opacity: 0.9 },
-  setRowName: { flex: 1, fontSize: 16, fontWeight: '600' },
-  setRowCount: { fontSize: 14 },
+  setRowName: { ...Typography.subheading, flex: 1 },
+  setRowCount: { ...Typography.bodySmall },
 
   deco: { position: 'absolute', width: 200, height: 200, borderRadius: 100, zIndex: -1 },
   decoTop: { top: -40, left: -40 },

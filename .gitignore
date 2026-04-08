@@ -9,7 +9,7 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Native (app prebuild output at repo root)
 .kotlin/
 *.orig.*
 *.jks
@@ -21,13 +21,15 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
-# debug
+# debug / logs
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
 
-# macOS
+# macOS / Windows
 .DS_Store
+Thumbs.db
 *.pem
 
 # local env files
@@ -37,6 +39,19 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# generated native folders
+# tests
+coverage/
+
+# Server (Express) — compiled output; keep source in git only
+server/dist/
+
+# Leftover native project under server/ (API-only; not required to run the backend)
+server/ios/
+server/android/
+
+# generated native folders (Expo prebuild at repo root)
 /ios
 /android
+
+# IDE (optional local junk)
+.idea/

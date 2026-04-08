@@ -1,85 +1,144 @@
 # Vocab App
 
-A vocabulary and flashcard app built with Expo (React Native) for iOS, Android, and Web. Uses Leitner-style spaced repetition (SRS) for review scheduling.
+Cross-platform vocabulary and flashcard practice built with **Expo** (React Native). Uses a Leitner-style schedule for reviews. Data can stay **fully local** or sync through an optional **Express + MongoDB** backend when you set `EXPO_PUBLIC_API_URL`.
+
+---
 
 ## Features
 
-- **Daily** – Today’s progress, daily goal, and quick access to start learning or open sets.
-- **Library** – Sets and cards; search within sets, edit, delete.
-- **Explore** – Search across all sets (words and meanings).
-- **Progress** – Total words, reviewed today, daily goal %, counts by set.
-- **Settings** – Profile-style stats and app info.
-- **Review** – Flip cards, rate (forgot / hard / good / easy), SRS updates.
+| Area | What it does |
+|------|----------------|
+| **Daily** | Today’s progress, daily goal, quick jump into review. |
+| **Library** | Sets and cards; search, edit, and delete. |
+| **Explore** | Global search across sets and cards (and notes where applicable). |
+| **Add** | Center tab — quick add a word to a set. |
+| **Notes** | Rich text (bold, headings, highlights) via `@10play/tentap-editor` in a WebView. |
+| **Settings** | Profile-style stats, daily goal, app info. |
+| **Review** | Flip cards; rate (forgot / hard / good / easy) and SRS updates. |
 
-Data can be stored locally (SQLite on native, localStorage on web) or via an optional backend API.
+**Storage behavior**
 
-## Setup
+- **No API URL:** SQLite on iOS/Android, `localStorage` on web — sets, cards, and notes all stay on the device/browser.
+- **With API URL:** Sets, cards, and notes are read/written through the backend (JWT after sign-in). Use the same `EXPO_PUBLIC_API_URL` port as the server’s `PORT`.
 
-### Prerequisites
+**Rich text / WebView:** If the note editor misbehaves in **Expo Go**, use a **development build** (`expo prebuild` / EAS) for reliable WebView behavior.
 
-- Node.js 18+
-- npm or yarn
-- For native: Xcode (iOS) and/or Android Studio (Android)
-- Optional backend: MongoDB (for API mode)
+---
 
-### Install and run (app only, local storage)
+## Requirements
+
+- **Node.js** 18+
+- **npm** (or yarn/pnpm)
+- **Native:** Xcode (iOS) and/or Android Studio — or run on web with `w` in Expo CLI
+- **Backend (optional):** MongoDB
+
+---
+
+## Quick start — app only (local data)
 
 ```bash
 npm install
 npx expo start
 ```
 
-Then press `i` for iOS simulator, `a` for Android emulator, or `w` for web.
+Then press **`i`** (iOS simulator), **`a`** (Android emulator), or **`w`** (web).
 
-- **Native (iOS/Android):** Data is stored in SQLite (`vocab.db`).
-- **Web:** Data is stored in `localStorage` (persists across refreshes).
+---
 
-### Optional: run with backend API
+## Optional — run with the API
 
-1. **Start the server** (uses MongoDB):
+### 1. Start the server
 
-   ```bash
-   cd server
-   cp .env.example .env
-   # Edit .env if needed (PORT, MONGODB_URI)
-   npm install
-   npm run dev
-   ```
+```bash
+cd server
+cp .env.example .env
+# Set MONGODB_URI, PORT, JWT_SECRET as needed
+npm install
+npm run dev
+```
 
-   Default: `PORT=3001`, `MONGODB_URI=mongodb://127.0.0.1:27017/vocab`.
+Defaults in `server/.env.example`: `PORT=3001`, `MONGODB_URI=mongodb://127.0.0.1:27017/vocab`.
 
-2. **Point the app to the API:**
+### 2. Point the app at the API
 
-   In the project root:
+From the **repository root**:
 
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+cp .env.example .env
+```
 
-   Set in `.env`:
+Set (example — **use the same port as the server**):
 
-   ```env
-   EXPO_PUBLIC_API_URL=http://localhost:3001
-   ```
+```env
+EXPO_PUBLIC_API_URL=http://localhost:3001
+```
 
-   Restart Expo. The app will use the API instead of local storage (SQLite/web).
+Restart the Expo dev server after changing env. Register or sign in when the app prompts; the client sends a JWT for API calls.
+
+### 3. Physical device + API
+
+`localhost` on the phone is the phone itself, not your computer.
+
+- Use your machine’s LAN IP and the server port, e.g. `http://192.168.1.42:3001`.
+- Phone and computer on the same Wi‑Fi; open the port in the OS firewall if needed.
+- For tricky networks, `npx expo start --tunnel` may help for the app UI; the API URL must still be reachable from the device.
+
+---
 
 ## Environment variables
 
 | Variable | Where | Description |
 |----------|--------|-------------|
-| `EXPO_PUBLIC_API_URL` | App (root `.env`) | Backend base URL. If set, app uses API; otherwise local SQLite (native) or localStorage (web). |
-| `PORT` | Server (`server/.env`) | HTTP port (default `3001`). |
-| `MONGODB_URI` | Server (`server/.env`) | MongoDB connection string (default `mongodb://127.0.0.1:27017/vocab`). |
+| `EXPO_PUBLIC_API_URL` | Root `.env` | Backend base URL. If unset, the app uses local storage only. |
+| `PORT` | `server/.env` | HTTP port (default `3001`). |
+| `MONGODB_URI` | `server/.env` | MongoDB connection string. |
+| `JWT_SECRET` | `server/.env` | JWT signing secret (required in production). |
+| `CORS_ORIGIN` | `server/.env` | Optional comma-separated allowed origins. |
+| `RATE_LIMIT_MAX` | `server/.env` | Optional requests per IP per 15 minutes (default `500`). |
+
+---
 
 ## Scripts
 
-- `npm start` – Start Expo dev server.
-- `npm run android` – Run on Android.
-- `npm run ios` – Run on iOS.
-- `npm run web` – Run in web browser.
+**App (root)**
+
+| Command | Description |
+|---------|-------------|
+| `npm start` | Expo dev server |
+| `npm run ios` | iOS (`expo run:ios`) |
+| `npm run android` | Android (`expo run:android`) |
+| `npm run web` | Web |
+| `npm test` | Jest |
+
+**Server (`server/`)**
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Dev server with reload (`ts-node-dev`) |
+| `npm run build` | Compile TypeScript to `server/dist/` |
+| `npm start` | Run compiled `node dist/index.js` |
+
+---
+
+## Project layout (high level)
+
+```
+app/           # expo-router screens (tabs, note editor, review, add, auth)
+components/    # UI (including design-system-style pieces under components/ui/)
+lib/           # DB abstraction, hooks, API client, note helpers
+server/src/    # Express API, Mongoose models, routes
+```
+
+---
+
+## MongoDB note (existing data)
+
+If the database had sets/cards from **before** per-user `userId` fields, older documents might not match the current API. For a clean slate you can drop affected collections (`sets`, `cards`) or point `MONGODB_URI` at a new database name. Users created via `/api/auth/register` remain valid.
+
+---
 
 ## Tech stack
 
-- **Expo** ~54, **React Native** 0.81, **expo-router** (file-based routing).
-- **Storage:** expo-sqlite (native), localStorage (web), or REST API (Express + Mongoose) when `EXPO_PUBLIC_API_URL` is set.
+- **Client:** Expo ~54, React 19, React Native, **expo-router**, **expo-sqlite** (native) / `localStorage` (web)
+- **Notes UI:** `@10play/tentap-editor`, `react-native-webview`
+- **Server:** Express, Mongoose, `helmet`, `express-rate-limit`, JWT auth

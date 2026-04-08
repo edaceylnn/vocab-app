@@ -1,6 +1,11 @@
-import type { CardRow, SetRow } from './types';
+import type { CardRow, NoteRow, SetRow } from './types';
 
-const STORAGE_KEYS = { sets: 'vocab_sets', cards: 'vocab_cards' } as const;
+const STORAGE_KEYS = { sets: 'vocab_sets', cards: 'vocab_cards', notes: 'vocab_notes' } as const;
+
+const EMPTY_DOC = JSON.stringify({
+  type: 'doc',
+  content: [{ type: 'paragraph' }],
+});
 
 function readFromStorage<T>(key: string, fallback: T): T {
   if (typeof localStorage === 'undefined') return fallback;
@@ -36,6 +41,15 @@ function setSets(sets: SetRow[]): void {
 
 function setCards(cards: CardRow[]): void {
   writeToStorage(STORAGE_KEYS.cards, cards);
+}
+
+function getNotes(): NoteRow[] {
+  const raw = readFromStorage<NoteRow[]>(STORAGE_KEYS.notes, []);
+  return raw.map((n) => ({ ...n, pinned: typeof n.pinned === 'number' ? n.pinned : 0 }));
+}
+
+function setNotes(notes: NoteRow[]): void {
+  writeToStorage(STORAGE_KEYS.notes, notes);
 }
 
 function uuid(): string {
@@ -219,4 +233,52 @@ export async function updateCard(
 export async function deleteCard(cardId: string): Promise<void> {
   const cards = getCards().filter((c) => c.id !== cardId);
   setCards(cards);
+}
+
+export async function createNote(title: string, body?: string): Promise<NoteRow> {
+  const notes = getNotes();
+  const id = uuid();
+  const now = new Date().toISOString();
+  const row: NoteRow = {
+    id,
+    title,
+    body: body ?? EMPTY_DOC,
+    pinned: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  notes.push(row);
+  setNotes(notes.sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt > a.updatedAt ? 1 : -1)));
+  return row;
+}
+
+export async function listNotes(): Promise<NoteRow[]> {
+  return [...getNotes()].sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt > a.updatedAt ? 1 : -1));
+}
+
+export async function getNoteById(id: string): Promise<NoteRow | null> {
+  return getNotes().find((n) => n.id === id) ?? null;
+}
+
+export async function updateNote(id: string, title: string, body: string): Promise<void> {
+  const notes = getNotes();
+  const note = notes.find((n) => n.id === id);
+  if (!note) return;
+  note.title = title;
+  note.body = body;
+  note.updatedAt = new Date().toISOString();
+  setNotes(notes);
+}
+
+export async function setNotePinned(id: string, pinned: number): Promise<void> {
+  const notes = getNotes();
+  const note = notes.find((n) => n.id === id);
+  if (!note) return;
+  note.pinned = pinned ? 1 : 0;
+  note.updatedAt = new Date().toISOString();
+  setNotes(notes);
+}
+
+export async function deleteNote(id: string): Promise<void> {
+  setNotes(getNotes().filter((n) => n.id !== id));
 }

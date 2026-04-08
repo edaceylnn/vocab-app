@@ -1,5 +1,5 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
-import type { CardRow, SetRow } from './types';
+import type { CardRow, NoteRow, SetRow } from './types';
 
 const DB_NAME = 'vocab.db';
 
@@ -38,7 +38,29 @@ async function initSchema(database: SQLiteDatabase): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_cards_setId ON cards(setId);
     CREATE INDEX IF NOT EXISTS idx_cards_nextReviewAt ON cards(nextReviewAt);
+
+    CREATE TABLE IF NOT EXISTS notes (
+      id TEXT PRIMARY KEY NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      pinned INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_notes_updatedAt ON notes(updatedAt);
   `);
+
+  // Add pinned column for existing installs
+  const cols = await database.getAllAsync<{ name: string }>('PRAGMA table_info(notes)');
+  const hasPinned = cols.some((c) => c.name === 'pinned');
+  if (!hasPinned) {
+    try {
+      await database.runAsync('ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0');
+    } catch {
+      // ignore
+    }
+  }
 }
 
 function uuid(): string {
@@ -249,4 +271,59 @@ export async function updateCard(
 export async function deleteCard(cardId: string): Promise<void> {
   const database = await getDb();
   await database.runAsync('DELETE FROM cards WHERE id = ?', [cardId]);
+}
+
+const EMPTY_DOC = JSON.stringify({
+  type: 'doc',
+  content: [{ type: 'paragraph' }],
+});
+
+export async function createNote(title: string, body?: string): Promise<NoteRow> {
+  const database = await getDb();
+  const id = uuid();
+  const now = new Date().toISOString();
+  const doc = body ?? EMPTY_DOC;
+  await database.runAsync(
+    'INSERT INTO notes (id, title, body, pinned, createdAt, updatedAt) VALUES (?, ?, ?, 0, ?, ?)',
+    [id, title, doc, now, now]
+  );
+  const row = await database.getFirstAsync<NoteRow>('SELECT * FROM notes WHERE id = ?', [id]);
+  if (!row) throw new Error('Note not created');
+  return row;
+}
+
+export async function listNotes(): Promise<NoteRow[]> {
+  const database = await getDb();
+  return database.getAllAsync<NoteRow>('SELECT * FROM notes ORDER BY pinned DESC, updatedAt DESC');
+}
+
+export async function getNoteById(id: string): Promise<NoteRow | null> {
+  const database = await getDb();
+  return database.getFirstAsync<NoteRow>('SELECT * FROM notes WHERE id = ?', [id]);
+}
+
+export async function updateNote(id: string, title: string, body: string): Promise<void> {
+  const database = await getDb();
+  const updatedAt = new Date().toISOString();
+  await database.runAsync('UPDATE notes SET title = ?, body = ?, updatedAt = ? WHERE id = ?', [
+    title,
+    body,
+    updatedAt,
+    id,
+  ]);
+}
+
+export async function setNotePinned(id: string, pinned: number): Promise<void> {
+  const database = await getDb();
+  const updatedAt = new Date().toISOString();
+  await database.runAsync('UPDATE notes SET pinned = ?, updatedAt = ? WHERE id = ?', [
+    pinned ? 1 : 0,
+    updatedAt,
+    id,
+  ]);
+}
+
+export async function deleteNote(id: string): Promise<void> {
+  const database = await getDb();
+  await database.runAsync('DELETE FROM notes WHERE id = ?', [id]);
 }

@@ -23,3 +23,11 @@ export const getRecentCards = useApi ? api.getRecentCards : local.getRecentCards
 export const getCardById = useApi ? api.getCardById : local.getCardById;
 export const updateCard = useApi ? api.updateCard : local.updateCard;
 export const deleteCard = useApi ? api.deleteCard : local.deleteCard;
+
+/** Notes use the API when `EXPO_PUBLIC_API_URL` is set; otherwise SQLite. */
+export const createNote = useApi ? api.createNote : local.createNote;
+export const listNotes = useApi ? api.listNotes : local.listNotes;
+export const getNoteById = useApi ? api.getNoteById : local.getNoteById;
+export const updateNote = useApi ? api.updateNote : local.updateNote;
+export const deleteNote = useApi ? api.deleteNote : local.deleteNote;
+export const setNotePinned = useApi ? api.setNotePinned : local.setNotePinned;

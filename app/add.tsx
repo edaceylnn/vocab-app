@@ -11,19 +11,27 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import Colors, { primary } from '@/constants/Colors';
+import { Typography } from '@/constants/Typography';
+import { PAGE_PADDING_TOP } from '@/constants/Layout';
 import { useColorScheme } from '@/components/useColorScheme';
 import { createCard } from '@/lib/db';
+import { hapticSuccess } from '@/lib/haptics';
 import { useSets } from '@/lib/hooks';
 import type { SetRow } from '@/lib/types';
+import { Input } from '@/components/ui/Input';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { Surface } from '@/components/ui/Surface';
 
 export default function AddScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { sets, defaultSet } = useSets();
+  const { sets, defaultSet, loading: setsLoading, error: setsError, refresh: refreshSets } = useSets();
 
   const [word, setWord] = useState('');
   const [meaning, setMeaning] = useState('');
@@ -48,6 +56,7 @@ export default function AddScreen() {
     setSaving(true);
     try {
       await createCard(selectedSetId, word.trim(), meaning.trim(), example.trim() || null);
+      hapticSuccess();
       if (rapidFire) {
         setWord('');
         setMeaning('');
@@ -63,13 +72,24 @@ export default function AddScreen() {
     }
   }, [word, meaning, example, rapidFire, canSave, saving, router, selectedSetId]);
 
+  const headerPaddingTop = Math.max(insets.top, 16) + PAGE_PADDING_TOP;
+  const footerPaddingBottom = Math.max(16, insets.bottom + 16);
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View
+        style={[
+          styles.header,
+          {
+            borderBottomColor: colors.border,
+            paddingTop: headerPaddingTop,
+          },
+        ]}
+      >
         <View style={styles.headerSpacer} />
         <Text style={[styles.title, { color: colors.text }]}>New Vocabulary</Text>
         <Pressable
@@ -94,46 +114,56 @@ export default function AddScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.muted }]}>WORD (ENGLISH)</Text>
-          <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
-            <TextInput
-              style={[styles.input, { color: colors.text }]}
-              placeholder="e.g. Epiphany"
-              placeholderTextColor={colors.muted}
-              value={word}
-              onChangeText={setWord}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-        </View>
-
-        <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.muted }]}>MEANING (TURKISH)</Text>
-          <TextInput
-            style={[styles.input, styles.inputFull, { borderColor: colors.border, backgroundColor: colors.cardBg, color: colors.text }]}
-            placeholder="Enter meaning"
-            placeholderTextColor={colors.muted}
-            value={meaning}
-            onChangeText={setMeaning}
+          <Input
+            colors={colors}
+            label="Word (English)"
+            placeholder="e.g. Epiphany"
+            value={word}
+            onChangeText={setWord}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
         </View>
 
         <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.muted }]}>EXAMPLE SENTENCE (OPTIONAL)</Text>
-          <TextInput
-            style={[styles.textArea, { borderColor: colors.border, backgroundColor: colors.cardBg, color: colors.text }]}
+          <Input colors={colors} label="Meaning (Turkish)" placeholder="Enter meaning" value={meaning} onChangeText={setMeaning} />
+        </View>
+
+        <View style={styles.field}>
+          <Input
+            colors={colors}
+            label="Example sentence (optional)"
             placeholder="Use it in a sentence to remember better..."
-            placeholderTextColor={colors.muted}
             value={example}
             onChangeText={setExample}
             multiline
             numberOfLines={4}
+            inputStyle={styles.exampleInput}
           />
         </View>
 
         <View style={styles.field}>
           <Text style={[styles.label, { color: colors.muted }]}>ADD TO SET</Text>
+          {setsError ? (
+            <Surface variant="cardMuted" colors={colors} style={styles.setError}>
+              <Text style={[styles.setErrorTitle, { color: colors.text }]}>Sets not available</Text>
+              <Text style={[styles.setErrorMsg, { color: colors.muted }]} numberOfLines={2}>
+                {setsError}
+              </Text>
+              <Pressable
+                onPress={() => void refreshSets()}
+                style={({ pressed }) => [{ paddingVertical: 10, paddingHorizontal: 12, opacity: pressed ? 0.9 : 1 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading sets"
+              >
+                <Text style={[styles.retryText, { color: primary }]}>Retry</Text>
+              </Pressable>
+            </Surface>
+          ) : setsLoading ? (
+            <Surface variant="cardMuted" colors={colors} style={styles.setLoading}>
+              <Text style={[styles.setLoadingText, { color: colors.muted }]}>Loading sets…</Text>
+            </Surface>
+          ) : (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -173,11 +203,21 @@ export default function AddScreen() {
               <Text style={[styles.setChipText, { color: primary }]}>New set</Text>
             </Pressable>
           </ScrollView>
+          )}
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
-        <View style={[styles.rapidFireRow, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+      <View
+        style={[
+          styles.footer,
+          {
+            borderTopColor: colors.border,
+            backgroundColor: colors.background,
+            paddingBottom: footerPaddingBottom,
+          },
+        ]}
+      >
+        <Surface variant="cardMuted" colors={colors} style={styles.rapidFireRow}>
           <View style={styles.rapidFireLeft}>
             <View style={styles.rapidFireIcon}>
               <MaterialCommunityIcons name="lightning-bolt" size={22} color={primary} />
@@ -197,18 +237,16 @@ export default function AddScreen() {
           >
             <View style={[styles.toggleThumb, rapidFire && styles.toggleThumbOn]} />
           </Pressable>
-        </View>
+        </Surface>
 
-        <Pressable
-          style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
+        <PrimaryButton
+          title="Save Entry"
+          colors={colors}
           onPress={saveEntry}
-          disabled={!canSave || saving}
-          accessibilityLabel="Save entry"
-          accessibilityRole="button"
-        >
-          <MaterialCommunityIcons name="content-save" size={22} color="#fff" />
-          <Text style={styles.saveBtnText}>Save Entry</Text>
-        </Pressable>
+          disabled={!canSave}
+          loading={saving}
+          style={styles.saveBtn}
+        />
       </View>
     </KeyboardAvoidingView>
   );
@@ -221,11 +259,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 48,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  title: { fontSize: 18, fontWeight: '700' },
+  title: { ...Typography.heading },
   headerSpacer: { width: 40 },
   closeBtn: { padding: 4 },
   progressBarBg: { height: 4 },
@@ -233,12 +270,9 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 24 },
   field: { marginBottom: 24 },
-  label: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16 },
-  input: { flex: 1, height: 56, fontSize: 18 },
-  inputFull: { height: 56, borderRadius: 12, paddingHorizontal: 16, borderWidth: 1 },
+  label: { ...Typography.sectionLabel, marginBottom: 8 },
   inputIcon: { marginLeft: 8 },
-  textArea: { minHeight: 120, borderRadius: 12, padding: 16, borderWidth: 1, textAlignVertical: 'top', fontSize: 16 },
+  exampleInput: { minHeight: 120, textAlignVertical: 'top' },
   setRow: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 4 },
   setChip: {
     paddingHorizontal: 16,
@@ -250,17 +284,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   setChipNew: { borderStyle: 'dashed' },
-  setChipText: { fontSize: 14, fontWeight: '600', maxWidth: 140 },
-  footer: { padding: 16, paddingBottom: 32, borderTopWidth: 1 },
-  rapidFireRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
+  setChipText: { ...Typography.bodySmallMedium, maxWidth: 140 },
+  setLoading: { padding: 12 },
+  setLoadingText: { ...Typography.bodySmallMedium },
+  setError: { padding: 12, gap: 6 },
+  setErrorTitle: { ...Typography.bodySmallMedium },
+  setErrorMsg: { ...Typography.caption },
+  retryText: { ...Typography.bodySmallMedium },
+  footer: { paddingHorizontal: 16, paddingTop: 16, borderTopWidth: 1 },
+  rapidFireRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, marginBottom: 16 },
   rapidFireLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rapidFireIcon: {
     width: 40,
@@ -270,8 +302,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rapidFireTitle: { fontSize: 14, fontWeight: '700' },
-  rapidFireSub: { fontSize: 12, marginTop: 2 },
+  rapidFireTitle: { ...Typography.bodySmallMedium },
+  rapidFireSub: { ...Typography.caption, marginTop: 2 },
   toggle: {
     width: 44,
     height: 24,
@@ -288,19 +320,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   toggleThumbOn: { alignSelf: 'flex-end' },
-  saveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 56,
-    backgroundColor: primary,
-    borderRadius: 12,
-    shadowColor: primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-  },
-  saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  saveBtn: { marginTop: 4 },
 });

@@ -4,6 +4,16 @@ export interface SetRow {
   createdAt: string;
 }
 
+export interface NoteRow {
+  id: string;
+  title: string;
+  /** Serialized Tiptap/ProseMirror JSON document */
+  body: string;
+  pinned: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CardRow {
   id: string;
   setId: string;

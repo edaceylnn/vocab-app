@@ -14,6 +14,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors, { primary } from '@/constants/Colors';
+import { Typography } from '@/constants/Typography';
 import {
   PAGE_PADDING_HORIZONTAL,
   PAGE_PADDING_TOP,
@@ -21,6 +22,7 @@ import {
 } from '@/constants/Layout';
 import { getAllCards, getAllSets } from '@/lib/db';
 import type { CardRow, SetRow } from '@/lib/types';
+import { Surface } from '@/components/ui/Surface';
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -31,6 +33,7 @@ export default function ExploreScreen() {
   const [cards, setCards] = useState<CardRow[]>([]);
   const [sets, setSets] = useState<SetRow[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'cards' | 'sets' | 'notes'>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,6 +75,10 @@ export default function ExploreScreen() {
   const paddingTop = Math.max(insets.top, 16) + PAGE_PADDING_TOP;
   const paddingBottom = CONTENT_BOTTOM_PADDING + insets.bottom;
 
+  const goBack = useCallback(() => {
+    router.replace('/library');
+  }, [router]);
+
   const renderItem = useCallback(
     ({ item }: { item: CardRow }) => {
       const setName = setByName[item.setId] ?? 'Unknown';
@@ -80,57 +87,82 @@ export default function ExploreScreen() {
           style={({ pressed }) => [
             styles.row,
             {
-              backgroundColor: colorScheme === 'dark' ? 'rgba(30,41,59,0.4)' : '#fff',
-              borderColor: colorScheme === 'dark' ? '#334155' : '#f1f5f9',
+              backgroundColor: colors.surface1,
+              borderColor: 'transparent',
+              shadowColor: colors.shadow,
+              opacity: pressed ? 0.94 : 1,
             },
-            pressed && styles.rowPressed,
           ]}
           onPress={() => router.push(`/edit/${item.id}`)}
         >
+          <View style={styles.rowIcon}>
+            <MaterialCommunityIcons name="book-open-variant" size={24} color={primary} />
+          </View>
           <View style={styles.rowMain}>
+            <Text style={[styles.badge, { color: colors.primary, backgroundColor: colors.surface3 }]}>Card</Text>
             <Text style={[styles.rowFront, { color: colors.text }]} numberOfLines={1}>
               {item.front}
             </Text>
-            <Text style={[styles.rowBack, { color: colors.muted }]} numberOfLines={1}>
+            <Text style={[styles.rowBack, { color: colors.muted }]} numberOfLines={2}>
               {item.back}
             </Text>
+            <Text style={[styles.rowSet, { color: colors.muted }]} numberOfLines={1}>
+              in Set: <Text style={{ color: colors.text }}>{setName}</Text>
+            </Text>
           </View>
-          <Text style={[styles.rowSet, { color: colors.muted }]} numberOfLines={1}>
-            {setName}
-          </Text>
-          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.muted} />
+          <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
         </Pressable>
       );
     },
     [colorScheme, colors, setByName, router]
   );
 
+  const headerBlock = (
+    <View
+      style={[
+        styles.header,
+        {
+          paddingTop,
+          paddingHorizontal: PAGE_PADDING_HORIZONTAL,
+          paddingBottom: 12,
+          borderBottomColor: colors.border,
+        },
+      ]}
+    >
+      <View style={styles.headerRow}>
+        <Pressable
+          onPress={goBack}
+          hitSlop={12}
+          style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+        >
+          <MaterialCommunityIcons name="chevron-left" size={28} color={colors.text} />
+        </Pressable>
+        <View style={styles.headerTitles}>
+          <Text style={[styles.title, { color: colors.text }]}>Explore</Text>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>
+            Search across all sets
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={primary} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {headerBlock}
+        <View style={[styles.centered, { flex: 1 }]}>
+          <ActivityIndicator size="large" color={primary} />
+        </View>
       </View>
     );
   }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop,
-            paddingHorizontal: PAGE_PADDING_HORIZONTAL,
-            paddingBottom: 12,
-            borderBottomColor: colors.border,
-          },
-        ]}
-      >
-        <Text style={[styles.title, { color: colors.text }]}>Explore</Text>
-        <Text style={[styles.subtitle, { color: colors.muted }]}>
-          Search across all sets
-        </Text>
-      </View>
+      {headerBlock}
 
       <View
         style={[
@@ -141,19 +173,11 @@ export default function ExploreScreen() {
           },
         ]}
       >
-        <View
-          style={[
-            styles.searchInputWrap,
-            {
-              backgroundColor: colorScheme === 'dark' ? 'rgba(30,41,59,0.5)' : '#f1f5f9',
-              borderColor: colors.border,
-            },
-          ]}
-        >
+        <Surface variant="input" colors={colors} style={styles.searchInputWrap}>
           <MaterialCommunityIcons name="magnify" size={20} color={colors.muted} />
           <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search words or meanings..."
+            style={[styles.searchInput, Typography.input, { color: colors.text }]}
+            placeholder="Search all sets and cards..."
             placeholderTextColor={colors.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -164,7 +188,33 @@ export default function ExploreScreen() {
               <MaterialCommunityIcons name="close-circle" size={20} color={colors.muted} />
             </Pressable>
           )}
-        </View>
+        </Surface>
+      </View>
+
+      <View style={[styles.chipsRow, { paddingHorizontal: PAGE_PADDING_HORIZONTAL }]}>
+        {([
+          { id: 'all', label: 'All' },
+          { id: 'cards', label: 'Cards' },
+          { id: 'sets', label: 'Sets' },
+          { id: 'notes', label: 'Notes' },
+        ] as const).map((c) => {
+          const active = filter === c.id;
+          return (
+            <Pressable
+              key={c.id}
+              onPress={() => setFilter(c.id)}
+              style={({ pressed }) => [
+                styles.chip,
+                {
+                  backgroundColor: active ? colors.primary : colors.surface1,
+                  opacity: pressed ? 0.92 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.chipText, { color: active ? '#fff' : colors.muted }]}>{c.label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {!searchQuery.trim() ? (
@@ -176,7 +226,7 @@ export default function ExploreScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredCards}
+          data={filter === 'all' || filter === 'cards' ? filteredCards : []}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={[
@@ -203,34 +253,45 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { alignItems: 'center', justifyContent: 'center' },
   header: { borderBottomWidth: 1 },
-  title: { fontSize: 24, fontWeight: '700' },
-  subtitle: { fontSize: 14, marginTop: 4 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  backBtn: { marginRight: 4, marginLeft: -4 },
+  backBtnPressed: { opacity: 0.6 },
+  headerTitles: { flex: 1, minWidth: 0 },
+  title: { ...Typography.title },
+  subtitle: { ...Typography.bodySmall, marginTop: 4 },
   searchWrap: { paddingVertical: 12, borderBottomWidth: 1 },
   searchInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
+    paddingHorizontal: 18,
     gap: 10,
+    height: 64,
   },
-  searchInput: { flex: 1, height: 44, fontSize: 16 },
+  searchInput: { flex: 1, height: 44 },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingTop: 12, paddingBottom: 10 },
+  chip: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999 },
+  chipText: { ...Typography.captionMedium, textTransform: 'none', letterSpacing: 0 },
   listContent: { paddingTop: 8 },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
+    alignItems: 'flex-start',
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    borderRadius: 24,
     marginBottom: 8,
     gap: 12,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 1,
+    shadowRadius: 32,
+    elevation: 8,
   },
-  rowPressed: { opacity: 0.9 },
+  rowIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(219, 225, 255, 0.45)' },
   rowMain: { flex: 1, minWidth: 0 },
-  rowFront: { fontSize: 16, fontWeight: '600' },
-  rowBack: { fontSize: 14, marginTop: 2 },
-  rowSet: { fontSize: 12, maxWidth: 100 },
+  badge: { ...Typography.captionUppercase, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, marginBottom: 8 },
+  rowFront: { ...Typography.titleLarge },
+  rowBack: { ...Typography.bodySmall, marginTop: 6 },
+  rowSet: { ...Typography.caption, marginTop: 8 },
   empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32 },
-  emptyText: { fontSize: 15, textAlign: 'center', marginTop: 12 },
+  emptyText: { ...Typography.bodySmall, textAlign: 'center', marginTop: 12 },
 });

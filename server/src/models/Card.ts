@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const CardSchema = new mongoose.Schema(
   {
     _id: { type: String, required: true },
+    userId: { type: String, required: true, index: true },
     setId: { type: String, required: true },
     front: { type: String, required: true },
     back: { type: String, required: true },
@@ -16,7 +17,7 @@ const CardSchema = new mongoose.Schema(
   { _id: false }
 );
 
-CardSchema.index({ setId: 1 });
+CardSchema.index({ userId: 1, setId: 1 });
 CardSchema.index({ nextReviewAt: 1 });
 
 export const CardModel = mongoose.model('Card', CardSchema);

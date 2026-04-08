@@ -1,6 +1,7 @@
 import { Text as DefaultText, View as DefaultView } from 'react-native';
 
 import Colors from '@/constants/Colors';
+import { Typography } from '@/constants/Typography';
 import { useColorScheme } from './useColorScheme';
 
 type ThemeProps = {
@@ -31,7 +32,7 @@ export function Text(props: TextProps) {
 
   return (
     <DefaultText
-      style={[{ color, fontFamily: 'Poppins_400Regular' }, style]}
+      style={[{ color, ...Typography.body }, style]}
       {...otherProps}
     />
   );

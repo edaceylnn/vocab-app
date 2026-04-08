@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { getDailyGoal } from './dailyGoalStorage';
 import {
   getAllSets,
   getCardsDueCount,
@@ -17,19 +18,27 @@ export function useSets(): {
   sets: SetRow[];
   defaultSet: SetRow | null;
   loading: boolean;
+  error: string | null;
   refresh: () => Promise<void>;
 } {
   const [sets, setSets] = useState<SetRow[]>([]);
   const [defaultSet, setDefaultSet] = useState<SetRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const defaultRow = await getOrCreateDefaultSet();
       const list = await getAllSets();
       setDefaultSet(defaultRow);
       setSets(list);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to load sets';
+      setError(message);
+      setDefaultSet(null);
+      setSets([]);
     } finally {
       setLoading(false);
     }
@@ -41,7 +50,7 @@ export function useSets(): {
     }, [refresh])
   );
 
-  return { sets, defaultSet, loading, refresh };
+  return { sets, defaultSet, loading, error, refresh };
 }
 
 export function useCardsDueToday(setId: string | null): {
@@ -137,4 +146,21 @@ export function useDailyStats(): {
     loading,
     refresh,
   };
+}
+
+export function useDailyGoal(): { goal: number; refresh: () => Promise<void> } {
+  const [goal, setGoal] = useState(30);
+
+  const refresh = useCallback(async () => {
+    const g = await getDailyGoal();
+    setGoal(g);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
+
+  return { goal, refresh };
 }

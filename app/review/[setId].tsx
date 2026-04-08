@@ -11,11 +11,12 @@ import {
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import Colors, { primary } from '@/constants/Colors';
+import { Typography } from '@/constants/Typography';
 import { useColorScheme } from '@/components/useColorScheme';
+import { getDailyGoal } from '@/lib/dailyGoalStorage';
+import { hapticLight, hapticMedium } from '@/lib/haptics';
 import { getCardsForStudy, getAllCards, getTodayReviewedCount, markCardReviewed } from '@/lib/db';
 import type { CardRow } from '@/lib/types';
-
-const DEFAULT_DAILY_GOAL = 30;
 
 function shuffleCards<T>(arr: T[]): T[] {
   const out = [...arr];
@@ -36,6 +37,7 @@ export default function ReviewScreen() {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [reviewedToday, setReviewedToday] = useState(0);
+  const [dailyGoal, setDailyGoal] = useState(30);
   const flipAnim = useState(() => new Animated.Value(0))[0];
 
   const card = cards[index];
@@ -59,7 +61,12 @@ export default function ReviewScreen() {
     loadCards();
   }, [loadCards]);
 
+  useEffect(() => {
+    getDailyGoal().then(setDailyGoal);
+  }, []);
+
   const flip = useCallback(() => {
+    hapticLight();
     const toBack = !flipped;
     setFlipped(toBack);
     Animated.spring(flipAnim, {
@@ -72,6 +79,7 @@ export default function ReviewScreen() {
 
   const handleNext = useCallback(async () => {
     if (!card) return;
+    hapticMedium();
     await markCardReviewed(card.id);
     const next = index + 1;
     if (next >= cards.length) {
@@ -137,7 +145,7 @@ export default function ReviewScreen() {
           <View style={styles.progressRow}>
             <Text style={[styles.progressLabel, { color: colors.muted }]}>Daily Goal</Text>
             <Text style={[styles.progressValue, { color: primary }]}>
-              {progress}/{DEFAULT_DAILY_GOAL}
+              {progress}/{dailyGoal}
             </Text>
           </View>
           <View style={[styles.progressBarBg, { backgroundColor: colors.border }]}>
@@ -145,7 +153,7 @@ export default function ReviewScreen() {
               style={[
                 styles.progressBarFill,
                 {
-                  width: `${Math.min(100, (progress / DEFAULT_DAILY_GOAL) * 100)}%`,
+                  width: `${dailyGoal > 0 ? Math.min(100, (progress / dailyGoal) * 100) : 0}%`,
                   backgroundColor: primary,
                 },
               ]}
@@ -239,23 +247,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  progressLabel: { fontSize: 12, fontWeight: '500' },
-  progressValue: { fontSize: 12, fontWeight: '700' },
+  progressLabel: { ...Typography.captionMedium },
+  progressValue: { ...Typography.captionBold },
   progressBarBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressBarFill: { height: '100%', borderRadius: 3 },
 
-  emptyText: { flex: 1, textAlign: 'center' },
+  emptyText: { ...Typography.bodySmall, flex: 1, textAlign: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  emptyTitle: { fontSize: 20, fontWeight: '700' },
+  emptyTitle: { ...Typography.titleMedium },
   backBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 },
-  backBtnText: { color: '#fff', fontWeight: '700' },
+  backBtnText: { ...Typography.subheading, color: '#fff' },
 
   cardArea: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    perspective: 1000,
   },
   card: {
     position: 'absolute',
@@ -270,14 +277,14 @@ const styles = StyleSheet.create({
     backfaceVisibility: 'hidden',
   },
   cardFront: {},
-  cardFrontLabel: { position: 'absolute', top: 16, right: 16, fontSize: 12, fontWeight: '700' },
-  cardWord: { fontSize: 32, fontWeight: '700', textAlign: 'center', marginBottom: 24 },
-  tapHint: { position: 'absolute', bottom: 24, fontSize: 14 },
+  cardFrontLabel: { ...Typography.captionBold, position: 'absolute', top: 16, right: 16 },
+  cardWord: { ...Typography.cardWord, textAlign: 'center', marginBottom: 24 },
+  tapHint: { ...Typography.bodySmall, position: 'absolute', bottom: 24 },
   tapHintBack: { position: 'absolute', bottom: 24 },
   cardBack: {},
-  cardBackLabel: { fontSize: 12, fontWeight: '700', color: primary, marginBottom: 12 },
-  cardMeaning: { fontSize: 28, fontWeight: '700', color: primary, textAlign: 'center', marginBottom: 12 },
-  cardExample: { fontSize: 14, fontStyle: 'italic', textAlign: 'center' },
+  cardBackLabel: { ...Typography.captionBold, color: primary, marginBottom: 12 },
+  cardMeaning: { ...Typography.cardMeaning, color: primary, textAlign: 'center', marginBottom: 12 },
+  cardExample: { ...Typography.bodySmall, fontStyle: 'italic', textAlign: 'center' },
 
   footer: { padding: 16, paddingBottom: 32, borderTopWidth: 1 },
   nextBtn: {
@@ -286,5 +293,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  nextBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  nextBtnText: { ...Typography.subheading, color: '#fff' },
 });

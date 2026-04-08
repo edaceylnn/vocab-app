@@ -1,13 +1,16 @@
 import { Tabs, useRouter } from 'expo-router';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, type PressableProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import Colors, { primary } from '@/constants/Colors';
+import { Typography } from '@/constants/Typography';
 import { useColorScheme } from '@/components/useColorScheme';
+import { hapticLight } from '@/lib/haptics';
 
 const FAB_SIZE = 56;
 const FAB_ICON_SIZE = 28;
+const FAB_LIFT_Y = -24;
 
 const ICON_SIZE = 24;
 
@@ -28,17 +31,30 @@ function TabIcon(props: {
   );
 }
 
-function AddTabButton(props: { style?: object; onPress?: () => void; [key: string]: unknown }) {
+function AddTabButton(props: PressableProps) {
   const router = useRouter();
-  const colors = Colors[useColorScheme() ?? 'light'];
-  const openAdd = () => router.push('/add');
+  const colorScheme = useColorScheme();
+  const openAdd = () => {
+    hapticLight();
+    router.push('/add');
+  };
+  const { style, ...rest } = props;
   return (
     <Pressable
-      {...props}
+      {...rest}
       onPress={openAdd}
-      style={[props.style, styles.fabTabWrap]}
+      style={(state) => [typeof style === 'function' ? style(state) : style, styles.fabTabWrap]}
     >
-      <View style={styles.fabOuter}>
+      <View
+        style={[
+          styles.fabOuter,
+          {
+            borderColor: colorScheme === 'dark' ? 'rgba(30,41,59,0.9)' : '#ffffff',
+            backgroundColor:
+              colorScheme === 'dark' ? 'rgba(15,23,42,0.6)' : 'rgba(255,255,255,0.85)',
+          },
+        ]}
+      >
         <View style={styles.fab}>
           <MaterialCommunityIcons name="plus" size={FAB_ICON_SIZE} color="#fff" />
         </View>
@@ -67,7 +83,7 @@ export default function TabLayout() {
             height: 72 + insets.bottom,
           },
         ],
-        tabBarLabelStyle: styles.tabLabel,
+        tabBarLabelStyle: Typography.label,
         tabBarItemStyle: styles.tabItem,
       }}
     >
@@ -102,16 +118,17 @@ export default function TabLayout() {
         options={{
           title: 'Add',
           tabBarIcon: () => null,
+          tabBarLabel: '',
           tabBarButton: (props) => <AddTabButton {...props} />,
         }}
       />
       <Tabs.Screen
-        name="progress"
+        name="notes"
         options={{
-          title: 'Progress',
+          title: 'Notes',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon
-              name={focused ? 'chart-box' : 'chart-box-outline'}
+              name={focused ? 'notebook' : 'notebook-outline'}
               color={color}
               focused={focused}
             />
@@ -153,29 +170,31 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     height: 72,
   },
-  tabLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
   tabItem: {
     paddingTop: 4,
   },
   fabTabWrap: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 4,
+    justifyContent: 'center',
+    paddingBottom: 0,
+    zIndex: 20,
+    elevation: 16,
   },
   fabOuter: {
-    marginTop: -24,
+    transform: [{ translateY: FAB_LIFT_Y }],
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 8,
+    borderRadius: 999,
+    padding: 8,
+    borderTopLeftRadius: 9999,
+    borderTopRightRadius: 9999,
   },
   fab: {
     width: FAB_SIZE,
     height: FAB_SIZE,
-    borderRadius: FAB_SIZE / 2,
+    borderRadius: FAB_SIZE,
     backgroundColor: primary,
     alignItems: 'center',
     justifyContent: 'center',

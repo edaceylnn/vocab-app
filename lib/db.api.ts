@@ -1,15 +1,28 @@
-import type { CardRow, SetRow } from './types';
+import type { CardRow, NoteRow, SetRow } from './types';
+import { notifyAuthUnauthorized } from './authUnauthorized';
+import { getStoredToken, setStoredToken } from './authSession';
 
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = await getStoredToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
+    headers,
   });
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+  if (res.status === 401) {
+    await setStoredToken(null);
+    notifyAuthUnauthorized();
+    throw new Error((data as { error?: string }).error ?? 'Unauthorized');
+  }
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
   return data as T;
 }
 
@@ -129,5 +142,42 @@ export async function updateCardAfterReview(
   await api(`/api/cards/${cardId}/after-review`, {
     method: 'POST',
     body: JSON.stringify({ newBox, nextReviewAt, correct }),
+  });
+}
+
+export async function createNote(title: string, body: string, pinned: number = 0): Promise<NoteRow> {
+  return api<NoteRow>('/api/notes', {
+    method: 'POST',
+    body: JSON.stringify({ title, body, pinned }),
+  });
+}
+
+export async function listNotes(): Promise<NoteRow[]> {
+  return api<NoteRow[]>('/api/notes');
+}
+
+export async function getNoteById(id: string): Promise<NoteRow | null> {
+  try {
+    return await api<NoteRow>(`/api/notes/${id}`);
+  } catch {
+    return null;
+  }
+}
+
+export async function updateNote(id: string, title: string, body: string): Promise<void> {
+  await api(`/api/notes/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ title, body }),
+  });
+}
+
+export async function deleteNote(id: string): Promise<void> {
+  await api(`/api/notes/${id}`, { method: 'DELETE' });
+}
+
+export async function setNotePinned(id: string, pinned: number): Promise<void> {
+  await api(`/api/notes/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ pinned }),
   });
 }
